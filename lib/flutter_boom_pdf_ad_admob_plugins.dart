@@ -4,8 +4,14 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_boom_pdf_ad_core_plugins/flutter_boom_pdf_ad_core_plugins.dart'
     as core;
 import 'package:google_mobile_ads/google_mobile_ads.dart' as gma;
+// ignore: implementation_imports
+import 'package:google_mobile_ads/src/ad_instance_manager.dart' as gma_internal;
+import 'package:query_ad_revenue/query_ad_revenue.dart';
 
 import 'flutter_boom_pdf_ad_admob_plugins_platform_interface.dart';
+
+export 'package:query_ad_revenue/query_ad_revenue.dart'
+    show QueryAdRevenueConfig;
 
 class FlutterBoomPdfAdAdmobPlugins {
   FlutterBoomPdfAdAdmobPlugins();
@@ -13,7 +19,11 @@ class FlutterBoomPdfAdAdmobPlugins {
   static final FlutterBoomPdfAdAdmobAdapter adapter =
       FlutterBoomPdfAdAdmobAdapter();
 
-  static void install({core.FlutterBoomPdfAdCorePlugins? into}) {
+  static Future<void> install({
+    required QueryAdRevenueConfig queryAdRevenueConfig,
+    core.FlutterBoomPdfAdCorePlugins? into,
+  }) async {
+    await QueryAdRevenue.instance.initConfig(config: queryAdRevenueConfig);
     (into ?? core.FlutterBoomPdfAdCorePlugins.instance).registerAdapter(
       adapter,
     );
@@ -266,12 +276,12 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     }
   }
 
-  void _completeLoaded(
+  Future<void> _completeLoaded(
     Completer<core.AdLoadResult> completer,
     gma.Ad ad,
     core.AdType adType, {
     _AdmobEventEmitter? events,
-  }) {
+  }) async {
     if (completer.isCompleted) {
       ad.dispose();
       events?.close();
@@ -279,9 +289,41 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     }
     final emitter = events ?? _AdmobEventEmitter();
     if (ad is gma.AdWithoutView) ad.onPaidEvent = emitter.paid;
+    final estimatedRevenueMicros = await _queryEstimatedRevenue(ad, adType);
+    if (completer.isCompleted) {
+      await ad.dispose();
+      emitter.close();
+      return;
+    }
     completer.complete(
-      core.AdLoadResult.success(_AdmobLoadedAd(ad, adType, emitter)),
+      core.AdLoadResult.success(
+        _AdmobLoadedAd(ad, adType, emitter),
+        estimatedRevenueMicros: estimatedRevenueMicros,
+      ),
     );
+  }
+
+  Future<double> _queryEstimatedRevenue(gma.Ad ad, core.AdType adType) async {
+    final adId = gma_internal.instanceManager.adIdFor(ad);
+    if (adId == null) return 0;
+    try {
+      final revenue = switch (adType) {
+        core.AdType.appOpen => QueryAdRevenue.instance.getOpenAdRevenue(
+          adId.toString(),
+        ),
+        core.AdType.interstitial => QueryAdRevenue.instance.getIntAdRevenue(
+          adId.toString(),
+        ),
+        core.AdType.native => QueryAdRevenue.instance.getNativeAdRevenue(
+          adId.toString(),
+        ),
+        core.AdType.rewarded || core.AdType.banner => Future<double>.value(0),
+      };
+      final value = await revenue;
+      return value.isFinite && value > 0 ? value : 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   void _completeFailure(
