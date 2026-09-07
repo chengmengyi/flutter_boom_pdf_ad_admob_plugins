@@ -36,6 +36,7 @@ class FlutterBoomPdfAdAdmobPlugins {
 class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
   core.AdNetworkConfiguration _configuration =
       const core.AdNetworkConfiguration();
+  Future<void>? _initializationCompleted;
 
   @override
   String get networkId => 'admob';
@@ -48,9 +49,15 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
   }
 
   @override
-  Future<void> initialize() async {
-    await gma.MobileAds.instance.initialize();
+  Future<void> initialize() {
+    _initializationCompleted ??= gma.MobileAds.instance.initialize().then<void>(
+      (_) {},
+    );
+    return Future<void>.value();
   }
+
+  @override
+  Future<void>? get initializationCompleted => _initializationCompleted;
 
   @override
   bool supports(core.AdType adType) => true;

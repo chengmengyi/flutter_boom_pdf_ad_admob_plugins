@@ -29,3 +29,8 @@ after installing the adapter.
 `install` initializes `query_ad_revenue` before registering the AdMob
 adapter. App-open, interstitial and native ads save the queried estimated
 revenue in micros; other formats use `0` until a query API is available.
+
+AdMob initialization is non-blocking: the adapter starts
+`MobileAds.instance.initialize()` and immediately allows Core to continue.
+Core emits `onNetworkInitialized('admob')` and `onAdmobInitialized()` only
+after the Mobile Ads initialization Future actually completes.
