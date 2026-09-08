@@ -15,8 +15,7 @@ dependencies:
     path: ../flutter_boom_pdf_ad_core_plugins
   google_mobile_ads: 7.0.0
   plugin_platform_interface: ^2.0.2
-  query_ad_revenue:
-    path: ../query_ad_revenue
+  query_ad_revenue: 0.0.3
 
 dev_dependencies:
   flutter_test:
