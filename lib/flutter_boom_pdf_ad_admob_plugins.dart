@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_boom_pdf_ad_core_plugins/flutter_boom_pdf_ad_core_plugins.dart'
     as core;
@@ -34,6 +36,14 @@ class FlutterBoomPdfAdAdmobPlugins {
 }
 
 class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
+  static const _debugRevenueMicrosCandidates = <double>[
+    123000,
+    1240000,
+    12500000,
+    126000000,
+  ];
+  static final _debugRandom = Random();
+
   core.AdNetworkConfiguration _configuration =
       const core.AdNetworkConfiguration();
   Future<void>? _initializationCompleted;
@@ -312,25 +322,33 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
 
   Future<double> _queryEstimatedRevenue(gma.Ad ad, core.AdType adType) async {
     final adId = gma_internal.instanceManager.adIdFor(ad);
-    if (adId == null) return 0;
+    var value = 0.0;
     try {
-      final revenue = switch (adType) {
-        core.AdType.appOpen => QueryAdRevenue.instance.getOpenAdRevenue(
-          adId.toString(),
-        ),
-        core.AdType.interstitial => QueryAdRevenue.instance.getIntAdRevenue(
-          adId.toString(),
-        ),
-        core.AdType.native => QueryAdRevenue.instance.getNativeAdRevenue(
-          adId.toString(),
-        ),
-        core.AdType.rewarded || core.AdType.banner => Future<double>.value(0),
-      };
-      final value = await revenue;
-      return value.isFinite && value > 0 ? value : 0;
+      if (adId != null) {
+        final revenue = switch (adType) {
+          core.AdType.appOpen => QueryAdRevenue.instance.getOpenAdRevenue(
+            adId.toString(),
+          ),
+          core.AdType.interstitial => QueryAdRevenue.instance.getIntAdRevenue(
+            adId.toString(),
+          ),
+          core.AdType.native => QueryAdRevenue.instance.getNativeAdRevenue(
+            adId.toString(),
+          ),
+          core.AdType.rewarded || core.AdType.banner => Future<double>.value(0),
+        };
+        final queried = await revenue;
+        if (queried.isFinite && queried > 0) value = queried;
+      }
     } catch (_) {
-      return 0;
+      // Treat query failures as zero so Debug builds can use the same fallback.
     }
+    if (kDebugMode && value == 0) {
+      return _debugRevenueMicrosCandidates[_debugRandom.nextInt(
+        _debugRevenueMicrosCandidates.length,
+      )];
+    }
+    return value;
   }
 
   void _completeFailure(
