@@ -27,10 +27,14 @@ Inspector. Business code should use `FlutterBoomPdfAdCorePlugins.instance`
 after installing the adapter.
 
 `install` initializes `query_ad_revenue` before registering the AdMob
-adapter. App-open, interstitial and native ads save the queried estimated
-revenue in micros; other formats use `0` until a query API is available.
+adapter. App-open, interstitial and native ads divide the queried estimated
+revenue by `1000000` before caching it; other formats use `0` until a query API
+is available.
 
-AdMob initialization is non-blocking: the adapter starts
-`MobileAds.instance.initialize()` and immediately allows Core to continue.
-Core emits `onNetworkInitialized('admob')` and `onAdmobInitialized()` only
-after the Mobile Ads initialization Future actually completes.
+On the first Core load, the adapter automatically completes UMP first. It only
+requests AdMob ads when `canRequestAds` is true. Mobile Ads initialization is
+then non-blocking: the adapter starts `MobileAds.instance.initialize()` and
+immediately allows Core to load. Core emits `onNetworkInitialized('admob')`
+and `onAdmobInitialized()` only after the Mobile Ads initialization Future
+actually completes. Business code does not need to call `handleUmpConsent()`
+or `initializeNetworks()` before loading.

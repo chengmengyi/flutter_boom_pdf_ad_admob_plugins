@@ -36,6 +36,7 @@ class FlutterBoomPdfAdAdmobPlugins {
 }
 
 class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
+  static const _revenueScale = 1000000.0;
   static const _debugRevenueMicrosCandidates = <double>[
     123000,
     1240000,
@@ -50,6 +51,9 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
 
   @override
   String get networkId => 'admob';
+
+  @override
+  bool get requiresConsentBeforeInitialization => true;
 
   @override
   Future<void> configure(core.AdNetworkConfiguration configuration) async {
@@ -344,11 +348,12 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
       // Treat query failures as zero so Debug builds can use the same fallback.
     }
     if (kDebugMode && value == 0) {
-      return _debugRevenueMicrosCandidates[_debugRandom.nextInt(
-        _debugRevenueMicrosCandidates.length,
-      )];
+      value =
+          _debugRevenueMicrosCandidates[_debugRandom.nextInt(
+            _debugRevenueMicrosCandidates.length,
+          )];
     }
-    return value;
+    return value / _revenueScale;
   }
 
   void _completeFailure(
