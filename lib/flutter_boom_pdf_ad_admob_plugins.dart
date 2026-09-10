@@ -21,11 +21,17 @@ class FlutterBoomPdfAdAdmobPlugins {
   static final FlutterBoomPdfAdAdmobAdapter adapter =
       FlutterBoomPdfAdAdmobAdapter();
 
+  /// [smallNativeAdLayoutName] is the Android XML layout used only by AdMob
+  /// small native ads. It must contain AdMob view IDs such as `ad_headline`,
+  /// `ad_body`, `ad_call_to_action`, and `ad_app_icon`. A TradPlus native XML
+  /// uses different IDs and cannot be reused here.
   static Future<void> install({
     required QueryAdRevenueConfig queryAdRevenueConfig,
+    String? smallNativeAdLayoutName,
     core.FlutterBoomPdfAdCorePlugins? into,
   }) async {
     await QueryAdRevenue.instance.initConfig(config: queryAdRevenueConfig);
+    adapter.setSmallNativeAdLayoutName(smallNativeAdLayoutName);
     (into ?? core.FlutterBoomPdfAdCorePlugins.instance).registerAdapter(
       adapter,
     );
@@ -47,7 +53,15 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
 
   core.AdNetworkConfiguration _configuration =
       const core.AdNetworkConfiguration();
+  String? _smallNativeAdLayoutName;
   Future<void>? _initializationCompleted;
+
+  void setSmallNativeAdLayoutName(String? layoutName) {
+    final normalized = layoutName?.trim();
+    _smallNativeAdLayoutName = normalized == null || normalized.isEmpty
+        ? null
+        : normalized;
+  }
 
   @override
   String get networkId => 'admob';
@@ -59,7 +73,7 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
   Future<void> configure(core.AdNetworkConfiguration configuration) async {
     _configuration = configuration;
     await FlutterBoomPdfAdAdmobPluginsPlatform.instance
-        .configureSmallNativeAdLayout(configuration.smallNativeAdLayoutName);
+        .configureSmallNativeAdLayout(_smallNativeAdLayoutName);
   }
 
   @override
@@ -232,8 +246,7 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     final events = _AdmobEventEmitter();
     final factoryId = request.interstitialLikeNative
         ? 'full_screen_native'
-        : (_configuration.smallNativeAdLayoutName != null &&
-              request.smallTemplateNative)
+        : (_smallNativeAdLayoutName != null && request.smallTemplateNative)
         ? 'guide_compact_native'
         : null;
     final configuredStyle =

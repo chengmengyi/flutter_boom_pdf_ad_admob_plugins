@@ -9,6 +9,7 @@ import 'package:flutter_boom_pdf_ad_admob_plugins/flutter_boom_pdf_ad_admob_plug
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FlutterBoomPdfAdAdmobPlugins.install(
+    smallNativeAdLayoutName: 'admob_small_native_ad',
     queryAdRevenueConfig: const QueryAdRevenueConfig(
       enableRevenue: true,
       openKeyList: <String>['YOUR_OPEN_REVENUE_KEY'],
@@ -20,6 +21,11 @@ Future<void> main() async {
   runApp(const App());
 }
 ```
+
+`smallNativeAdLayoutName` is an AdMob-only Android XML layout. It must use
+AdMob IDs such as `ad_headline`, `ad_body`, `ad_call_to_action`, and
+`ad_app_icon`. Do not pass a TradPlus native layout because TradPlus binds a
+different set of view IDs.
 
 The adapter implements initialization, app-open, interstitial, rewarded,
 banner and native loading, display callbacks, paid events, UMP and Ad
