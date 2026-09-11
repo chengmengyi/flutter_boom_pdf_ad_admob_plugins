@@ -2,7 +2,7 @@ name: flutter_boom_pdf_ad_admob_plugins
 publish_to: none
 description: "Google Mobile Ads adapter for flutter_boom_pdf_ad_core_plugins."
 version: 0.0.1
-homepage:
+homepage: https://github.com/chengmengyi/flutter_boom_pdf_ad_admob_plugins
 
 environment:
   sdk: ^3.9.2
@@ -11,8 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_boom_pdf_ad_core_plugins:
-    path: ../flutter_boom_pdf_ad_core_plugins
+  flutter_boom_pdf_ad_core_plugins: 0.0.1
   google_mobile_ads: 7.0.0
   plugin_platform_interface: ^2.0.2
   query_ad_revenue: 0.0.3
