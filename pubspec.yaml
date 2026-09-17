@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_boom_pdf_ad_core_plugins: 0.0.1
+  flutter_boom_pdf_ad_core_plugins: 0.0.2
   google_mobile_ads: 7.0.0
   plugin_platform_interface: ^2.0.2
   query_ad_revenue: 0.0.3
