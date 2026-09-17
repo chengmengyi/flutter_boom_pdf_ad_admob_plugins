@@ -1,6 +1,6 @@
 name: flutter_boom_pdf_ad_admob_plugins
 description: "Google Mobile Ads adapter for flutter_boom_pdf_ad_core_plugins."
-version: 0.0.2
+version: 0.0.3
 homepage: https://github.com/chengmengyi/flutter_boom_pdf_ad_admob_plugins
 
 environment:
