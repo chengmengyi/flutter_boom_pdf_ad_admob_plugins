@@ -358,7 +358,6 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
         if (queried.isFinite && queried > 0) value = queried;
       }
     } catch (_) {
-      // Treat query failures as zero so Debug builds can use the same fallback.
     }
     if (kDebugMode && value == 0) {
       value =
