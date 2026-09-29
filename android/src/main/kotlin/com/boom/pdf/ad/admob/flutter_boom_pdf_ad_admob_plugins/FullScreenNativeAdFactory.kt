@@ -11,12 +11,18 @@ import com.google.android.gms.ads.nativead.NativeAdView
 import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
 
 class FullScreenNativeAdFactory(
-    private val context: Context
+    private val context: Context,
+    private val onNativeAdHeadline: (String?, String?, Boolean) -> Unit
 ) : GoogleMobileAdsPlugin.NativeAdFactory {
     override fun createNativeAd(
         nativeAd: NativeAd,
         customOptions: MutableMap<String, Any>?
     ): NativeAdView {
+        onNativeAdHeadline(
+            nativeAd.headline,
+            customOptions?.get("boomNativeAdToken")?.toString(),
+            false
+        )
         val adView = LayoutInflater.from(context)
             .inflate(R.layout.fpad_full_screen_native_ad, null) as NativeAdView
         val media = adView.findViewById<MediaView>(R.id.fpad_ad_media)

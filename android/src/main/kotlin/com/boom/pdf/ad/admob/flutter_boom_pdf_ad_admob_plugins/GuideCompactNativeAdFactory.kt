@@ -10,7 +10,8 @@ import com.google.android.gms.ads.nativead.NativeAdView
 import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
 
 class GuideCompactNativeAdFactory(
-    private val context: Context
+    private val context: Context,
+    private val onNativeAdHeadline: (String?, String?, Boolean) -> Unit
 ) : GoogleMobileAdsPlugin.NativeAdFactory {
     var layoutName: String? = null
 
@@ -18,6 +19,11 @@ class GuideCompactNativeAdFactory(
         nativeAd: NativeAd,
         customOptions: MutableMap<String, Any>?
     ): NativeAdView {
+        onNativeAdHeadline(
+            nativeAd.headline,
+            customOptions?.get("boomNativeAdToken")?.toString(),
+            false
+        )
         val name = layoutName?.trim().orEmpty()
         require(name.isNotEmpty()) { "Missing configured layout name for compact native ad" }
         val layoutId = context.resources.getIdentifier(name, "layout", context.packageName)

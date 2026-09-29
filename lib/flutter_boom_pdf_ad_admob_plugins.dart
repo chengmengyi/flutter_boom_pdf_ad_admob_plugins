@@ -55,6 +55,9 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
       const core.AdNetworkConfiguration();
   String? _smallNativeAdLayoutName;
   Future<void>? _initializationCompleted;
+  StreamSubscription<Map<String, dynamic>>? _nativeHeadlineSubscription;
+  final Map<String, _AdmobEventEmitter> _nativeHeadlineEmitters = {};
+  int _nextNativeHeadlineToken = 0;
 
   void setSmallNativeAdLayoutName(String? layoutName) {
     final normalized = layoutName?.trim();
@@ -249,6 +252,13 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
         : (_smallNativeAdLayoutName != null && request.smallTemplateNative)
         ? 'guide_compact_native'
         : null;
+    final headlineToken = factoryId == null
+        ? null
+        : 'admob-native-${_nextNativeHeadlineToken++}';
+    if (headlineToken != null) {
+      _listenForNativeHeadlines();
+      _nativeHeadlineEmitters[headlineToken] = events;
+    }
     final configuredStyle =
         request.networkOptions['nativeTemplateStyle']
             as gma.NativeTemplateStyle? ??
@@ -258,9 +268,19 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
       adUnitId: adId,
       factoryId: factoryId,
       listener: gma.NativeAdListener(
-        onAdLoaded: (ad) =>
-            _completeLoaded(completer, ad, core.AdType.native, events: events),
+        onAdLoaded: (ad) => _completeLoaded(
+          completer,
+          ad,
+          core.AdType.native,
+          events: events,
+          onDispose: headlineToken == null
+              ? null
+              : () => _nativeHeadlineEmitters.remove(headlineToken),
+        ),
         onAdFailedToLoad: (ad, error) async {
+          if (headlineToken != null) {
+            _nativeHeadlineEmitters.remove(headlineToken);
+          }
           final network = _networkFor(ad);
           await ad.dispose();
           events.close();
@@ -271,6 +291,9 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
         onPaidEvent: events.paid,
       ),
       request: _adRequest(request),
+      customOptions: headlineToken == null
+          ? null
+          : <String, Object>{'boomNativeAdToken': headlineToken},
       nativeAdOptions: gma.NativeAdOptions(
         adChoicesPlacement: _adChoicesPlacement(),
         mediaAspectRatio: request.interstitialLikeNative
@@ -290,11 +313,33 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     try {
       await ad.load();
     } catch (error) {
+      if (headlineToken != null) {
+        _nativeHeadlineEmitters.remove(headlineToken);
+      }
       await ad.dispose();
       events.close();
       _completeException(completer, error);
     }
     return completer.future;
+  }
+
+  void _listenForNativeHeadlines() {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    _nativeHeadlineSubscription ??= FlutterBoomPdfAdAdmobPluginsPlatform
+        .instance
+        .nativeAdHeadlineStream
+        .listen((event) {
+          final token = event['token'];
+          if (token is! String || token.isEmpty) return;
+          final emitter = _nativeHeadlineEmitters.remove(token);
+          if (emitter == null) return;
+          final rawHeadline = event['headline'];
+          if (rawHeadline != null && rawHeadline is! String) return;
+          emitter.nativeHeadline(
+            rawHeadline as String?,
+            isNextGenAdmob: event['isNextGenAdmob'] == true,
+          );
+        }, onError: (_) {});
   }
 
   gma.AdChoicesPlacement _adChoicesPlacement() {
@@ -315,8 +360,10 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     gma.Ad ad,
     core.AdType adType, {
     _AdmobEventEmitter? events,
+    VoidCallback? onDispose,
   }) async {
     if (completer.isCompleted) {
+      onDispose?.call();
       ad.dispose();
       events?.close();
       return;
@@ -325,13 +372,14 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     if (ad is gma.AdWithoutView) ad.onPaidEvent = emitter.paid;
     final estimatedRevenueMicros = await _queryEstimatedRevenue(ad, adType);
     if (completer.isCompleted) {
+      onDispose?.call();
       await ad.dispose();
       emitter.close();
       return;
     }
     completer.complete(
       core.AdLoadResult.success(
-        _AdmobLoadedAd(ad, adType, emitter),
+        _AdmobLoadedAd(ad, adType, emitter, onDispose: onDispose),
         estimatedRevenueMicros: estimatedRevenueMicros,
       ),
     );
@@ -357,8 +405,7 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
         final queried = await revenue;
         if (queried.isFinite && queried > 0) value = queried;
       }
-    } catch (_) {
-    }
+    } catch (_) {}
     if (kDebugMode && value == 0) {
       value =
           _debugRevenueMicrosCandidates[_debugRandom.nextInt(
@@ -514,13 +561,23 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
     Iterable<String> activityNames,
   ) => FlutterBoomPdfAdAdmobPluginsPlatform.instance
       .updateCloseableFullScreenAdActivityNames(activityNames);
+
+  @override
+  Future<void> dispose() async {
+    await _nativeHeadlineSubscription?.cancel();
+    _nativeHeadlineSubscription = null;
+    _nativeHeadlineEmitters.clear();
+    _initializationCompleted = null;
+  }
 }
 
 class _AdmobLoadedAd implements core.LoadedNetworkAd {
-  _AdmobLoadedAd(this._ad, this.adType, this._events);
+  _AdmobLoadedAd(this._ad, this.adType, this._events, {VoidCallback? onDispose})
+    : _onDispose = onDispose;
 
   final gma.Ad _ad;
   final _AdmobEventEmitter _events;
+  final VoidCallback? _onDispose;
   @override
   final core.AdType adType;
   bool _disposed = false;
@@ -632,6 +689,7 @@ class _AdmobLoadedAd implements core.LoadedNetworkAd {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _onDispose?.call();
     await _ad.dispose();
     await _events.close();
   }
@@ -647,6 +705,12 @@ class _AdmobEventEmitter {
   void impression() => _add(const core.AdNetworkEvent.impression());
   void clicked() => _add(const core.AdNetworkEvent.clicked());
   void closed() => _add(const core.AdNetworkEvent.closed());
+  void nativeHeadline(String? headline, {bool isNextGenAdmob = false}) => _add(
+    core.AdNetworkEvent.nativeHeadline(
+      headline: headline,
+      isNextGenAdmob: isNextGenAdmob,
+    ),
+  );
 
   void paid(
     gma.Ad _,

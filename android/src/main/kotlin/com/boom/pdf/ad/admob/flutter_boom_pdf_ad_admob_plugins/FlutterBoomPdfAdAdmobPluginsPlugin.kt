@@ -4,16 +4,25 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
 import java.util.Collections
 import java.util.WeakHashMap
 
-class FlutterBoomPdfAdAdmobPluginsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+class FlutterBoomPdfAdAdmobPluginsPlugin :
+    FlutterPlugin,
+    MethodChannel.MethodCallHandler,
+    EventChannel.StreamHandler {
     private lateinit var channel: MethodChannel
+    private lateinit var nativeAdHeadlineEventChannel: EventChannel
+    private var nativeAdHeadlineEventSink: EventChannel.EventSink? = null
+    private val pendingNativeAdHeadlineEvents = ArrayDeque<Map<String, Any?>>()
     private var binding: FlutterPluginBinding? = null
     private var application: Application? = null
     private var compactFactory: GuideCompactNativeAdFactory? = null
@@ -56,6 +65,11 @@ class FlutterBoomPdfAdAdmobPluginsPlugin : FlutterPlugin, MethodChannel.MethodCa
             "flutter_boom_pdf_ad_admob_plugins"
         )
         channel.setMethodCallHandler(this)
+        nativeAdHeadlineEventChannel = EventChannel(
+            flutterPluginBinding.binaryMessenger,
+            "flutter_boom_pdf_ad_admob_plugins/native_ad_headline"
+        )
+        nativeAdHeadlineEventChannel.setStreamHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -82,7 +96,10 @@ class FlutterBoomPdfAdAdmobPluginsPlugin : FlutterPlugin, MethodChannel.MethodCa
     private fun ensureFactories() {
         val current = binding ?: return
         if (!compactRegistered) {
-            val factory = GuideCompactNativeAdFactory(current.applicationContext)
+            val factory = GuideCompactNativeAdFactory(
+                current.applicationContext,
+                ::emitNativeAdHeadline
+            )
             factory.layoutName = layoutName
             compactRegistered = GoogleMobileAdsPlugin.registerNativeAdFactory(
                 current.flutterEngine,
@@ -95,7 +112,10 @@ class FlutterBoomPdfAdAdmobPluginsPlugin : FlutterPlugin, MethodChannel.MethodCa
             fullScreenRegistered = GoogleMobileAdsPlugin.registerNativeAdFactory(
                 current.flutterEngine,
                 "full_screen_native",
-                FullScreenNativeAdFactory(current.applicationContext)
+                FullScreenNativeAdFactory(
+                    current.applicationContext,
+                    ::emitNativeAdHeadline
+                )
             )
         }
     }
@@ -122,6 +142,42 @@ class FlutterBoomPdfAdAdmobPluginsPlugin : FlutterPlugin, MethodChannel.MethodCa
         return closed
     }
 
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        nativeAdHeadlineEventSink = events
+        if (events == null) return
+        while (pendingNativeAdHeadlineEvents.isNotEmpty()) {
+            events.success(pendingNativeAdHeadlineEvents.removeFirst())
+        }
+    }
+
+    override fun onCancel(arguments: Any?) {
+        nativeAdHeadlineEventSink = null
+    }
+
+    private fun emitNativeAdHeadline(
+        headline: String?,
+        token: String?,
+        isNextGenAdmob: Boolean
+    ) {
+        if (token.isNullOrBlank()) return
+        val event = mapOf<String, Any?>(
+            "headline" to headline,
+            "token" to token,
+            "isNextGenAdmob" to isNextGenAdmob
+        )
+        Handler(Looper.getMainLooper()).post {
+            val sink = nativeAdHeadlineEventSink
+            if (sink != null) {
+                sink.success(event)
+                return@post
+            }
+            if (pendingNativeAdHeadlineEvents.size >= MAX_PENDING_NATIVE_AD_HEADLINES) {
+                pendingNativeAdHeadlineEvents.removeFirst()
+            }
+            pendingNativeAdHeadlineEvents.addLast(event)
+        }
+    }
+
     override fun onDetachedFromEngine(flutterPluginBinding: FlutterPluginBinding) {
         if (compactRegistered) {
             GoogleMobileAdsPlugin.unregisterNativeAdFactory(
@@ -138,8 +194,15 @@ class FlutterBoomPdfAdAdmobPluginsPlugin : FlutterPlugin, MethodChannel.MethodCa
         application?.unregisterActivityLifecycleCallbacks(lifecycle)
         activities.clear()
         channel.setMethodCallHandler(null)
+        nativeAdHeadlineEventChannel.setStreamHandler(null)
+        nativeAdHeadlineEventSink = null
+        pendingNativeAdHeadlineEvents.clear()
         compactFactory = null
         application = null
         binding = null
+    }
+
+    private companion object {
+        const val MAX_PENDING_NATIVE_AD_HEADLINES = 32
     }
 }

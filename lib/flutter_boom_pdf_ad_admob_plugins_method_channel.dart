@@ -6,11 +6,21 @@ import 'flutter_boom_pdf_ad_admob_plugins_platform_interface.dart';
 /// An implementation of [FlutterBoomPdfAdAdmobPluginsPlatform] that uses method channels.
 class MethodChannelFlutterBoomPdfAdAdmobPlugins
     extends FlutterBoomPdfAdAdmobPluginsPlatform {
+  static const EventChannel _nativeAdHeadlineEventChannel = EventChannel(
+    'flutter_boom_pdf_ad_admob_plugins/native_ad_headline',
+  );
+
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel(
     'flutter_boom_pdf_ad_admob_plugins',
   );
+
+  @override
+  Stream<Map<String, dynamic>> get nativeAdHeadlineStream =>
+      _nativeAdHeadlineEventChannel.receiveBroadcastStream().map((event) {
+        return Map<String, dynamic>.from(event as Map);
+      });
 
   @override
   Future<String?> getPlatformVersion() async {

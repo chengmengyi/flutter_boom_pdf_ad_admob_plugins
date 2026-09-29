@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_boom_pdf_ad_admob_plugins/flutter_boom_pdf_ad_admob_plugins.dart';
 import 'package:flutter_boom_pdf_ad_admob_plugins/flutter_boom_pdf_ad_admob_plugins_method_channel.dart';
 import 'package:flutter_boom_pdf_ad_admob_plugins/flutter_boom_pdf_ad_admob_plugins_platform_interface.dart';
@@ -7,6 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 const _queryRevenueChannel = MethodChannel('query_ad_revenue');
+const _nativeHeadlineChannel =
+    'flutter_boom_pdf_ad_admob_plugins/native_ad_headline';
+const _methodCodec = StandardMethodCodec();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +35,39 @@ void main() {
       await FlutterBoomPdfAdAdmobPlugins().getPlatformVersion(),
       'test-platform',
     );
+  });
+
+  test('native headline stream forwards token and headline', () async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final listening = Completer<void>();
+    messenger.setMockMessageHandler(_nativeHeadlineChannel, (message) async {
+      final call = _methodCodec.decodeMethodCall(message);
+      if (call.method == 'listen' && !listening.isCompleted) {
+        listening.complete();
+      }
+      return _methodCodec.encodeSuccessEnvelope(null);
+    });
+    final platform = MethodChannelFlutterBoomPdfAdAdmobPlugins();
+    final eventFuture = platform.nativeAdHeadlineStream.first;
+    await listening.future;
+
+    await messenger.handlePlatformMessage(
+      _nativeHeadlineChannel,
+      _methodCodec.encodeSuccessEnvelope(<String, Object?>{
+        'headline': 'Test Ad: Sample',
+        'token': 'native-1',
+        'isNextGenAdmob': false,
+      }),
+      (_) {},
+    );
+
+    expect(await eventFuture, <String, Object?>{
+      'headline': 'Test Ad: Sample',
+      'token': 'native-1',
+      'isNextGenAdmob': false,
+    });
+    messenger.setMockMessageHandler(_nativeHeadlineChannel, null);
   });
 
   test(

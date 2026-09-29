@@ -28,6 +28,12 @@ abstract class FlutterBoomPdfAdAdmobPluginsPlatform extends PlatformInterface {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
+  Stream<Map<String, dynamic>> get nativeAdHeadlineStream {
+    throw UnimplementedError(
+      'nativeAdHeadlineStream has not been implemented.',
+    );
+  }
+
   Future<void> configureSmallNativeAdLayout(String? layoutName) {
     throw UnimplementedError(
       'configureSmallNativeAdLayout() has not been implemented.',
