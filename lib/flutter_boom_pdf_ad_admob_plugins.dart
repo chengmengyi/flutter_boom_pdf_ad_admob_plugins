@@ -70,6 +70,10 @@ class FlutterBoomPdfAdAdmobAdapter extends core.FlutterBoomPdfAdAdapter {
   String get networkId => 'admob';
 
   @override
+  core.AdRefillTrigger get refillTrigger =>
+      core.AdRefillTrigger.afterShowSuccess;
+
+  @override
   bool get requiresConsentBeforeInitialization => true;
 
   @override
